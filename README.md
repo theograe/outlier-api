@@ -37,8 +37,8 @@ The product is intentionally narrow:
 
 - Node.js `20+`
 - a YouTube Data API key
-- an API key for local auth
-- an OpenAI API key if you want embedding-backed topic similarity
+- optionally an OpenAI API key if you want embedding-backed topic similarity
+- optionally an API key if you want to protect the API for local agents or external clients
 
 ## Quick start
 
@@ -52,10 +52,15 @@ Minimal `.env`:
 
 ```env
 YOUTUBE_API_KEY=...
-API_KEY=...
 OPENAI_API_KEY=...
+```
+
+Optional local auth:
+
+```env
+API_KEY=choose-a-long-random-string
 NEXT_PUBLIC_OPENOUTLIER_API_URL=http://localhost:3001
-NEXT_PUBLIC_OPENOUTLIER_API_KEY=...
+NEXT_PUBLIC_OPENOUTLIER_API_KEY=choose-a-long-random-string
 ```
 
 ## Scripts
@@ -86,6 +91,9 @@ OpenOutlier can be consumed four ways:
 - the TypeScript SDK in `packages/sdk`
 - the MCP server in `apps/mcp`
 - the CLI in `apps/cli`
+
+For local open-source use, the simplest mode is to leave `API_KEY` unset.
+That means the local web UI works without a browser-exposed key, and local agents can call the API directly on `http://localhost:3001`.
 
 ## Archived spike
 

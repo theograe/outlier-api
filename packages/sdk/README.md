@@ -15,7 +15,7 @@ import { OpenOutlierClient } from "@openoutlier/sdk";
 
 const client = new OpenOutlierClient({
   baseUrl: "http://localhost:3001",
-  apiKey: process.env.OPENOUTLIER_API_KEY!,
+  apiKey: process.env.OPENOUTLIER_API_KEY ?? "",
 });
 
 const results = await client.searchReferences(1, {
@@ -36,3 +36,5 @@ console.log(results);
 - trigger scans
 - search the outlier feed
 - save references
+
+If your local OpenOutlier instance is running without `API_KEY`, you can pass an empty string for `apiKey`.

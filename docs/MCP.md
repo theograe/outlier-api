@@ -2,10 +2,10 @@
 
 The MCP server exposes OpenOutlier as a small research toolset.
 
-## Required environment
+## Environment
 
 - `OPENOUTLIER_BASE_URL`
-- `OPENOUTLIER_API_KEY`
+- `OPENOUTLIER_API_KEY` if your local OpenOutlier instance has `API_KEY` enabled
 
 ## Available tools
 

@@ -1,10 +1,12 @@
 # API
 
-All protected routes require:
+If `API_KEY` is set, protected routes require:
 
 ```http
 x-api-key: your_api_key
 ```
+
+If `API_KEY` is not set, local requests work without auth.
 
 ## Health
 

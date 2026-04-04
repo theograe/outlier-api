@@ -34,6 +34,10 @@ export function buildApp() {
       return;
     }
 
+    if (!config.apiKey) {
+      return;
+    }
+
     const apiKey = request.headers["x-api-key"];
     if (apiKey !== config.apiKey) {
       return reply.unauthorized("Invalid API key.");
