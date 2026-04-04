@@ -3,11 +3,12 @@
 import { OpenOutlierClient } from "@openoutlier/sdk";
 
 function usage() {
-  console.log(`OpenOutlier agent CLI
+  console.log(`OpenOutlier CLI
 
 Commands:
-  run-seed --project <id> --video <url> [--source-set <id>] [--context <text>]
   discover --source-set <id> [--query <text>] [--limit <n>] [--auto-attach]
+  import-video --project <id> --video <url> [--source-set <id>]
+  scan --list <id>
 
 Environment:
   OPENOUTLIER_BASE_URL   Default: http://localhost:3001
@@ -42,26 +43,6 @@ async function main() {
     apiKey,
   });
 
-  if (command === "run-seed") {
-    const projectId = Number(readFlag("--project"));
-    const sourceSetId = readFlag("--source-set") ? Number(readFlag("--source-set")) : undefined;
-    const seedVideoUrl = readFlag("--video");
-    const adaptationContext = readFlag("--context");
-
-    if (!projectId || !seedVideoUrl) {
-      throw new Error("run-seed requires --project and --video.");
-    }
-
-    const result = await client.runSeedVideoWorkflow({
-      projectId,
-      sourceSetId,
-      seedVideoUrl,
-      adaptationContext,
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
   if (command === "discover") {
     const sourceSetId = Number(readFlag("--source-set"));
     if (!sourceSetId) {
@@ -76,6 +57,34 @@ async function main() {
       limit,
       autoAttach,
     });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "import-video") {
+    const projectId = Number(readFlag("--project"));
+    const sourceSetId = readFlag("--source-set") ? Number(readFlag("--source-set")) : undefined;
+    const videoUrl = readFlag("--video");
+
+    if (!projectId || !videoUrl) {
+      throw new Error("import-video requires --project and --video.");
+    }
+
+    const result = await client.importReferenceVideo(projectId, {
+      sourceSetId,
+      videoUrl,
+    });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  if (command === "scan") {
+    const listId = Number(readFlag("--list"));
+    if (!listId) {
+      throw new Error("scan requires --list.");
+    }
+
+    const result = await client.triggerScan(listId);
     console.log(JSON.stringify(result, null, 2));
     return;
   }

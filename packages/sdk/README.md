@@ -1,6 +1,6 @@
 # @openoutlier/sdk
 
-Typed TypeScript client for the OpenOutlier workflow API.
+Typed TypeScript client for the OpenOutlier discovery API.
 
 ## Install
 
@@ -18,19 +18,21 @@ const client = new OpenOutlierClient({
   apiKey: process.env.OPENOUTLIER_API_KEY!,
 });
 
-const workflow = await client.runSeedVideoWorkflow({
-  projectId: 1,
+const results = await client.searchReferences(1, {
   sourceSetId: 1,
-  seedVideoUrl: "https://www.youtube.com/watch?v=abc123xyz89",
-  adaptationContext: "Adapt this for editing educators.",
+  contentType: "long",
+  minScore: 3,
+  sort: "momentum",
+  limit: 10,
 });
 
-console.log(workflow.output);
+console.log(results);
 ```
 
-## Best default method
+## Main use cases
 
-For most agents, start with:
-
-- `runWorkflowAuto()`
-- or `runSeedVideoWorkflow()`
+- create and manage projects
+- discover channels
+- trigger scans
+- search the outlier feed
+- save references

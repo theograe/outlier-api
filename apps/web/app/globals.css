@@ -1,14 +1,14 @@
 :root {
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-soft: #fafafa;
-  --surface-muted: #f3f3f3;
-  --line: #e5e5e5;
-  --line-strong: #d4d4d4;
-  --text: #0f0f0f;
-  --muted: #6a6a6a;
-  --accent: #111111;
-  --danger: #111111;
+  --bg: #050505;
+  --surface: #0b0b0b;
+  --surface-soft: #101010;
+  --surface-muted: #151515;
+  --line: #232323;
+  --line-strong: #363636;
+  --text: #f5f5f5;
+  --muted: #9b9b9b;
+  --accent: #ffffff;
+  --danger: #ffffff;
 }
 
 * {
@@ -158,6 +158,7 @@ body {
 .pill.warm {
   color: var(--text);
   border-color: var(--line-strong);
+  background: var(--surface-muted);
 }
 
 .card-grid {
@@ -183,6 +184,10 @@ body {
   gap: 16px;
 }
 
+.card.card-simple {
+  grid-template-columns: 1fr;
+}
+
 .thumb-card-media {
   position: relative;
   min-height: 100%;
@@ -199,7 +204,7 @@ body {
   position: absolute;
   inset: auto 0 0;
   padding: 14px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.96) 100%);
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0) 0%, rgba(7, 7, 7, 0.98) 100%);
 }
 
 .card img,
@@ -216,6 +221,10 @@ body {
 
 .card-body {
   padding: 15px 15px 15px 0;
+}
+
+.card-body.card-body-simple {
+  padding: 16px 18px;
 }
 
 .toolbar,
@@ -253,7 +262,7 @@ body {
   border-radius: 10px;
   padding: 10px 14px;
   background: var(--text);
-  color: #ffffff;
+  color: #050505;
 }
 
 .button.secondary {
@@ -348,7 +357,7 @@ body {
 .segment.active {
   background: var(--text);
   border-color: var(--text);
-  color: #ffffff;
+  color: #050505;
 }
 
 .preset-pill {
@@ -378,6 +387,10 @@ pre {
   overflow: auto;
   font-size: 12px;
   line-height: 1.5;
+  background: #080808;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px;
 }
 
 @media (max-width: 980px) {

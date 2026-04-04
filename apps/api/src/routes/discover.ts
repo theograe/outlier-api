@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import { db } from "../db.js";
-import { getNiches, getSimilarThumbnails, getSimilarTopics, listDiscoverOutliers } from "../services/discovery.js";
+import { getNiches, getSimilarTopics, listDiscoverOutliers } from "../services/discovery.js";
 
 const discoverQuerySchema = z.object({
   listId: z.coerce.number().int().optional(),
@@ -59,15 +59,6 @@ export async function registerDiscoverRoutes(app: FastifyInstance): Promise<void
       return reply.notFound("Video not found.");
     }
     return { videoId: query.videoId, items: results };
-  });
-
-  app.get("/api/discover/similar-thumbnails", async (request, reply) => {
-    const query = z.object({ videoId: z.string(), limit: z.coerce.number().int().min(1).max(30).default(12) }).parse(request.query);
-    const results = await getSimilarThumbnails(query.videoId, query.limit);
-    if (!results) {
-      return reply.notFound("Video not found.");
-    }
-    return results;
   });
 
   app.get("/api/discover/niches", async (request) => {

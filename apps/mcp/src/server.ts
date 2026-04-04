@@ -59,6 +59,13 @@ server.registerTool("create_project", {
   }),
 }, async (args) => textResult(await client.createProject(args)));
 
+server.registerTool("get_project", {
+  description: "Fetch one OpenOutlier project with source sets and saved references.",
+  inputSchema: z.object({
+    projectId: z.number().int(),
+  }),
+}, async ({ projectId }) => textResult(await client.getProject(projectId)));
+
 server.registerTool("discover_channels", {
   description: "Discover YouTube channels for a source set.",
   inputSchema: z.object({
@@ -70,18 +77,18 @@ server.registerTool("discover_channels", {
   }),
 }, async ({ sourceSetId, ...input }) => textResult(await client.discoverChannels(sourceSetId, input)));
 
-server.registerTool("import_reference_video", {
-  description: "Import a seed video directly into a project as a reference.",
+server.registerTool("add_channel_to_source_set", {
+  description: "Attach a channel to a tracked source set.",
   inputSchema: z.object({
-    projectId: z.number().int(),
-    sourceSetId: z.number().int().optional(),
-    videoId: z.string().optional(),
-    videoUrl: z.string().optional(),
+    sourceSetId: z.number().int(),
+    channelUrl: z.string().optional(),
+    channelId: z.string().optional(),
+    handle: z.string().optional(),
   }),
-}, async ({ projectId, ...input }) => textResult(await client.importReferenceVideo(projectId, input)));
+}, async ({ sourceSetId, ...input }) => textResult(await client.addChannelToSourceSet(sourceSetId, input)));
 
 server.registerTool("search_references", {
-  description: "Search discover data for references inside a project.",
+  description: "Search the scanned outlier feed for a project.",
   inputSchema: z.object({
     projectId: z.number().int(),
     sourceSetId: z.number().int().optional(),
@@ -97,58 +104,37 @@ server.registerTool("search_references", {
   }),
 }, async ({ projectId, ...input }) => textResult(await client.searchReferences(projectId, input)));
 
-server.registerTool("generate_concept", {
-  description: "Generate a grounded concept from project references.",
-  inputSchema: z.object({
-    projectId: z.number().int(),
-    referenceIds: z.array(z.number().int()).optional(),
-    context: z.string().optional(),
-    providerId: z.number().int().optional(),
-  }),
-}, async ({ projectId, ...input }) => textResult(await client.generateConcept(projectId, input)));
-
-server.registerTool("generate_thumbnail", {
-  description: "Generate a thumbnail from project references.",
-  inputSchema: z.object({
-    projectId: z.number().int(),
-    referenceIds: z.array(z.number().int()).optional(),
-    prompt: z.string().optional(),
-    context: z.string().optional(),
-    characterProfileId: z.number().int().nullable().optional(),
-    size: z.enum(["16:9", "3:2", "1:1", "2:3"]).optional(),
-  }),
-}, async ({ projectId, ...input }) => textResult(await client.generateThumbnail(projectId, input)));
-
-server.registerTool("run_workflow_auto", {
-  description: "Run an OpenOutlier workflow automatically. Best default for agent execution.",
+server.registerTool("save_reference", {
+  description: "Save a video as a project reference.",
   inputSchema: z.object({
     projectId: z.number().int(),
     sourceSetId: z.number().int().optional(),
-    targetNiche: z.string().optional(),
-    targetChannelId: z.string().optional(),
-    startStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional(),
-    stopAfterStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional(),
-    referenceIds: z.array(z.number().int()).optional(),
-    seedVideoId: z.string().optional(),
-    seedVideoUrl: z.string().optional(),
-    input: z.record(z.string(), z.unknown()).optional(),
+    videoId: z.string(),
+    notes: z.string().optional(),
+    tags: z.array(z.string()).optional(),
   }),
-}, async (args) => textResult(await client.runWorkflowAuto(args)));
+}, async ({ projectId, ...input }) => textResult(await client.saveReference(projectId, input)));
 
-server.registerTool("get_workflow_run", {
-  description: "Fetch a workflow run by id.",
+server.registerTool("import_reference_video", {
+  description: "Import a single YouTube video directly as a saved reference.",
   inputSchema: z.object({
-    workflowRunId: z.number().int(),
+    projectId: z.number().int(),
+    sourceSetId: z.number().int().optional(),
+    videoId: z.string().optional(),
+    videoUrl: z.string().optional(),
   }),
-}, async ({ workflowRunId }) => textResult(await client.getWorkflowRun(workflowRunId)));
+}, async ({ projectId, ...input }) => textResult(await client.importReferenceVideo(projectId, input)));
 
-server.registerTool("advance_workflow_run", {
-  description: "Advance a workflow run manually or in copilot mode.",
+server.registerTool("trigger_scan", {
+  description: "Start a scan for a source set's backing list.",
   inputSchema: z.object({
-    workflowRunId: z.number().int(),
-    input: z.record(z.string(), z.unknown()).optional(),
+    listId: z.number().int().optional(),
   }),
-}, async ({ workflowRunId, input }) => textResult(await client.advanceWorkflowRun(workflowRunId, input)));
+}, async ({ listId }) => textResult(await client.triggerScan(listId)));
+
+server.registerTool("get_scan_status", {
+  description: "Fetch the current scan status.",
+}, async () => textResult(await client.getScanStatus()));
 
 const transport = new StdioServerTransport();
 await server.connect(transport);

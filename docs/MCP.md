@@ -1,77 +1,30 @@
-# MCP Setup
+# MCP
 
-OpenOutlier ships with an MCP server scaffold in `apps/mcp`.
+The MCP server exposes OpenOutlier as a small research toolset.
 
-It uses these environment variables:
+## Required environment
 
 - `OPENOUTLIER_BASE_URL`
 - `OPENOUTLIER_API_KEY`
 
-## Claude Desktop style config
-
-For MCP clients that use an `mcpServers` JSON block, this is the shape:
-
-```json
-{
-  "mcpServers": {
-    "openoutlier": {
-      "command": "node",
-      "args": ["/absolute/path/to/openoutlier api/apps/mcp/dist/server.js"],
-      "env": {
-        "OPENOUTLIER_BASE_URL": "http://localhost:3001",
-        "OPENOUTLIER_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-## Codex-compatible stdio config
-
-For clients that register MCP servers as stdio processes, use the same command/env shape:
-
-```json
-{
-  "name": "openoutlier",
-  "command": "node",
-  "args": ["/absolute/path/to/openoutlier api/apps/mcp/dist/server.js"],
-  "env": {
-    "OPENOUTLIER_BASE_URL": "http://localhost:3001",
-    "OPENOUTLIER_API_KEY": "your-api-key"
-  }
-}
-```
-
-## Development mode
-
-If you want to run the MCP server without building first:
-
-```json
-{
-  "mcpServers": {
-    "openoutlier": {
-      "command": "npx",
-      "args": ["tsx", "/absolute/path/to/openoutlier api/apps/mcp/src/server.ts"],
-      "env": {
-        "OPENOUTLIER_BASE_URL": "http://localhost:3001",
-        "OPENOUTLIER_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-## Exposed tools
-
-The MCP server exposes:
+## Available tools
 
 - `list_projects`
 - `create_project`
+- `get_project`
 - `discover_channels`
-- `import_reference_video`
+- `add_channel_to_source_set`
 - `search_references`
-- `generate_concept`
-- `generate_thumbnail`
-- `run_workflow_auto`
-- `get_workflow_run`
-- `advance_workflow_run`
+- `save_reference`
+- `import_reference_video`
+- `trigger_scan`
+- `get_scan_status`
+
+## Typical flow
+
+1. create or select a project
+2. discover channels for a source set
+3. attach the best channels
+4. trigger a scan
+5. search references
+6. save the strongest references

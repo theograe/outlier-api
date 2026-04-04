@@ -1,216 +1,67 @@
-# Agent Integration Guide
+# Agent Guide
 
-This guide is for agents that want to drive OpenOutlier directly over HTTP.
+OpenOutlier is now focused on one job: help an agent find and save outlier video references inside a niche.
 
-## What OpenOutlier is
+## Best flow
 
-OpenOutlier is a workflow engine for:
-
-1. defining a `Project`
-2. tracking channels in `Source Sets`
-3. finding and saving `References`
-4. generating grounded `Concepts`
-5. generating `Thumbnail` variants
-6. orchestrating the whole flow through `Workflow Runs`
-
-The easiest way to think about it:
-
-- `Project` = one niche or growth effort
-- `Source Set` = a group of channels
-- `Reference` = a saved inspiration video
-- `Concept` = adapted ideas, titles, and thumbnail direction
-- `Workflow Run` = the full guided process
-
-## Auth
-
-Every protected request requires:
-
-```http
-x-api-key: YOUR_API_KEY
-```
+1. Create or select a `Project`
+2. Create or select a `Source Set`
+3. Add competitor channels manually or discover them automatically
+4. Trigger a scan
+5. Search the outlier feed
+6. Save the strongest videos as `References`
 
 ## Best entrypoints
 
-### 1. User gives you a single YouTube video
+If the user gives a niche:
+- create a project
+- discover channels
+- attach the best suggestions
+- scan the source set
+- search references
+- save the top results
 
-Use this when the user already has a reference video.
+If the user gives competitor channels:
+- create a project
+- add those channels to a source set
+- scan
+- search and save
 
-Recommended flow:
+If the user gives a specific video:
+- import it directly with `POST /api/projects/:id/references/import-video`
 
-1. create or locate a project
-2. call `POST /api/workflow-runs/run-auto`
-3. pass `seedVideoUrl`
-4. stop after `concept_adaptation` if the user only wants ideas/titles/briefs
-5. continue to thumbnail generation if the user wants images now
+## Primary endpoints
 
-Example:
-
-```json
-{
-  "projectId": 1,
-  "sourceSetId": 1,
-  "seedVideoUrl": "https://www.youtube.com/watch?v=abc123xyz89",
-  "stopAfterStage": "concept_adaptation",
-  "input": {
-    "adaptationContext": "Adapt this for English editing educators selling short-form editing services."
-  }
-}
-```
-
-### 2. User gives you a niche, but no video
-
-Use this when the user wants discovery first.
-
-Recommended flow:
-
-1. create or locate a project
-2. create or locate a source set
-3. call `POST /api/source-sets/:id/discover`
-4. attach good channels with `POST /api/source-sets/:id/channels`
-5. search references with `POST /api/projects/:id/references/search`
-6. generate concepts with `POST /api/projects/:id/concepts/generate`
-7. generate thumbnails with `POST /api/projects/:id/thumbnails/generate`
-
-### 3. User wants full autonomous execution
-
-Use:
-
-- `POST /api/workflow-runs/run-auto`
-
-This is the best default autonomous agent entrypoint.
-
-## Canonical workflow
-
-### Source discovery
-
-Purpose:
-- define the target niche
-- attach the primary channel
-- add competitors manually or automatically
-
-Endpoints:
 - `POST /api/projects`
+- `GET /api/projects`
 - `POST /api/projects/:id/source-sets`
 - `POST /api/source-sets/:id/channels`
 - `POST /api/source-sets/:id/discover`
-
-### Reference research
-
-Purpose:
-- search scanned outlier videos
-- save the strongest references into the project
-
-Endpoints:
+- `POST /api/scan`
+- `GET /api/discover/outliers`
 - `POST /api/projects/:id/references/search`
+- `GET /api/projects/:id/references`
 - `POST /api/projects/:id/references`
 - `POST /api/projects/:id/references/import-video`
-- `GET /api/projects/:id/references`
 
-### Concept adaptation
+## Suggested agent behavior
 
-Purpose:
-- generate grounded ideas, titles, and thumbnail direction
-
-Endpoint:
-- `POST /api/projects/:id/concepts/generate`
-
-### Thumbnail creation
-
-Purpose:
-- generate an actual thumbnail using project references and optional character profiles
-
-Endpoint:
-- `POST /api/projects/:id/thumbnails/generate`
-
-## Workflow modes
-
-- `manual`: a human or agent advances deliberately
-- `copilot`: the system pauses between major stages for review
-- `auto`: OpenOutlier runs through stages automatically
-
-## Stage control
-
-Agents can start in the middle of the workflow.
-
-Useful fields:
-
-- `startStage`
-- `stopAfterStage`
-- `referenceIds`
-- `seedVideoId`
-- `seedVideoUrl`
-
-This is important because many users will enter with a specific video, not a full discovery brief.
-
-## Best practices for agents
-
-- Prefer `run-auto` when the user already gave a strong seed video.
-- Prefer source discovery when the user only gave a niche.
-- Save good videos as `References` before generating concepts.
-- Use project-scoped routes instead of legacy list routes.
-- Treat OpenOutlier outputs as grounded suggestions, not guaranteed truth.
-- Cite the source references you used in your own final answer.
+- Default to `contentType=long` unless the user explicitly wants shorts.
+- Save references with short tags so they stay easy to review later.
+- Prefer scanning a focused source set over running broad searches everywhere.
+- Treat OpenOutlier as a research system, not a generation system.
 
 ## Recommended system prompt
 
-Use this as a starting point for an agent that plugs into OpenOutlier:
-
-```text
 You are an OpenOutlier research agent.
 
-Your job is to turn niche inputs, competitor channels, or seed YouTube videos into grounded content concepts and thumbnail directions.
+Your job is to help the user find proven YouTube outlier videos inside their niche and save the strongest references.
 
-Prefer the workflow-native API:
-- projects
-- source sets
-- references
-- concepts
-- thumbnails
-- workflow runs
+Prefer this order:
+1. define the project and niche
+2. build the source set
+3. scan channels
+4. search the outlier feed
+5. save the best references
 
-When the user provides a specific YouTube video, prefer importing it directly and starting from concept adaptation.
-
-When the user provides only a niche, begin with source discovery and reference search.
-
-Always keep outputs grounded in saved references instead of producing generic content ideas.
-
-When possible, return:
-- the best adapted idea
-- title options
-- thumbnail direction
-- generated thumbnail URLs if available
-- which references were used
-```
-
-## Minimal HTTP client shape
-
-Any agent can plug in with:
-
-- a base URL
-- an API key
-- JSON `POST` support
-
-That means OpenOutlier is already usable as:
-
-- a direct REST integration
-- a future SDK backend
-- a future MCP tool server backend
-
-## Current packaging layers
-
-OpenOutlier now ships with:
-
-1. REST API
-2. OpenAPI spec
-3. typed TypeScript SDK
-4. MCP server
-5. CLI agent
-
-Use the layer that matches your integration:
-
-- direct HTTP for custom agents
-- SDK for code integrations
-- MCP for tool-using agents
-- CLI for scripts and automation
-
-The OpenAPI spec lives in [openapi.yaml](openapi.yaml).
+Do not invent ideas beyond the evidence in the saved references. Your main goal is discovery and curation.

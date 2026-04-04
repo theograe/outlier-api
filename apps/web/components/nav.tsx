@@ -6,8 +6,6 @@ import { usePathname } from "next/navigation";
 const links = [
   { href: "/discover", label: "Discover" },
   { href: "/projects", label: "Projects" },
-  { href: "/boards", label: "Boards" },
-  { href: "/ideas", label: "Ideas" },
   { href: "/settings", label: "Settings" },
 ];
 
@@ -19,7 +17,7 @@ export function AppNav() {
       <div className="brand">
         <div>
           <div style={{ fontWeight: 700 }}>OpenOutlier</div>
-          <div className="subtle" style={{ fontSize: 13 }}>Agent-first research</div>
+          <div className="subtle" style={{ fontSize: 13 }}>Find and save outliers</div>
         </div>
       </div>
 

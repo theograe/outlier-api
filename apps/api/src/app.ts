@@ -1,9 +1,6 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import sensible from "@fastify/sensible";
-import multipart from "@fastify/multipart";
-import fs from "node:fs/promises";
-import path from "node:path";
 import { ZodError } from "zod";
 import { config } from "./config.js";
 import { initializeDatabase } from "./db.js";
@@ -15,7 +12,6 @@ import { registerDiscoverRoutes } from "./routes/discover.js";
 import { registerScanRoutes } from "./routes/scan.js";
 import { registerSettingsRoutes } from "./routes/settings.js";
 import { registerAgentRoutes } from "./routes/agent.js";
-import { registerResearchRoutes } from "./routes/research.js";
 import { registerWorkflowRoutes } from "./routes/workflows.js";
 
 export function buildApp() {
@@ -23,11 +19,9 @@ export function buildApp() {
 
   const app = Fastify({ logger: true });
   const scanService = new ScanService();
-  const mediaRoot = path.resolve(config.mediaRoot);
 
   void app.register(cors, { origin: true });
   void app.register(sensible);
-  void app.register(multipart);
 
   app.get("/api/health", async () => ({
     ok: true,
@@ -35,30 +29,8 @@ export function buildApp() {
     timestamp: new Date().toISOString(),
   }));
 
-  app.get("/api/media/*", async (request, reply) => {
-    const relativePath = (request.params as { "*": string })["*"];
-    const normalizedPath = path.normalize(relativePath).replace(/^([/\\])+/, "");
-    const absolutePath = path.resolve(mediaRoot, normalizedPath);
-
-    if (absolutePath !== mediaRoot && !absolutePath.startsWith(`${mediaRoot}${path.sep}`)) {
-      return reply.forbidden("Invalid media path.");
-    }
-
-    let buffer: Buffer;
-    try {
-      buffer = await fs.readFile(absolutePath);
-    } catch {
-      return reply.notFound("Media not found.");
-    }
-
-    const ext = path.extname(absolutePath).toLowerCase();
-    const mimeType = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-    reply.type(mimeType);
-    return buffer;
-  });
-
   app.addHook("onRequest", async (request, reply) => {
-    if (request.url === "/api/health" || request.url.startsWith("/api/media/")) {
+    if (request.url === "/api/health") {
       return;
     }
 
@@ -75,7 +47,6 @@ export function buildApp() {
   void registerScanRoutes(app, scanService);
   void registerSettingsRoutes(app, scanService);
   void registerAgentRoutes(app);
-  void registerResearchRoutes(app);
   void registerWorkflowRoutes(app, scanService);
 
   app.setErrorHandler((error, _request, reply) => {

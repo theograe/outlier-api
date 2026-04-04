@@ -1,62 +1,52 @@
 # OpenOutlier
 
-OpenOutlier is an open-source YouTube outlier research engine for creator teams, agents, and operators. It helps you track channels, surface outlier videos, save references, adapt winning ideas to a target niche, and generate thumbnail directions and images from those references.
+OpenOutlier is an open-source YouTube outlier finder. It helps you track channels in a niche, scan their recent uploads, surface standout videos, and save the best references for later.
 
-This repo is intentionally agent-first:
-- a person can use the local UI
-- a copilot can drive the workflow with human approvals
-- an external agent can run the same workflow end-to-end over API
+The product is intentionally narrow:
+- track your niche
+- discover competitors
+- scan channels
+- filter the outlier feed
+- save strong references
 
-## What ships in the OSS MVP
+## What ships in this MVP
 
-- Fastify API for scans, discovery, research, workflows, settings, and media
-- Next.js local UI for discover, projects, boards, ideas, and settings
-- SQLite storage with schema boundaries designed for future Postgres migration
-- OpenAI-backed text generation and topic embeddings with heuristic fallback
-- Kie `nano-banana-2` thumbnail generation
-- character profiles with reusable face-sheet references for thumbnail consistency
-- workflow runs that support `manual`, `copilot`, and `auto` execution modes
-- workflow entry from tracked channels, saved references, or a single seed video URL
+- Fastify API for projects, source sets, scanning, discovery, and saved references
+- Next.js local UI for projects, discover, and settings
+- SQLite storage for local/self-hosted use
+- agent-friendly REST API, TypeScript SDK, MCP server, and CLI
+- topic similarity for finding related outlier ideas
 
-## Product model
+## Core model
 
-OpenOutlier is moving toward this canonical workflow model:
-
-- `Project`: one niche or channel growth effort
-- `Source Set`: your channel, competitors, or discovered channels
-- `Reference`: a saved outlier used as inspiration
-- `Concept`: an adapted idea package with titles, hooks, and thumbnail direction
-- `Thumbnail Run`: generated images and prompt lineage
-- `Workflow Run`: a guided pass through source discovery, research, adaptation, and thumbnail creation
-
-Legacy compatibility routes like `/api/lists` and `/api/feed` still exist for backward compatibility, but the main local UI now runs on projects, source sets, references, concepts, boards, and workflow runs.
+- `Project`: one niche or research focus
+- `Source Set`: a group of tracked channels inside a project
+- `Reference`: a saved outlier video worth studying
 
 ## Workspace layout
 
-- `apps/api`: Fastify API, scan scheduler, workflow orchestration, AI/image integrations
-- `apps/cli`: tiny CLI agent for scripted OpenOutlier workflows
-- `apps/mcp`: MCP server exposing OpenOutlier as tools over stdio
+- `apps/api`: Fastify API and scan scheduler
+- `apps/cli`: simple CLI for discovery tasks
+- `apps/mcp`: MCP server exposing OpenOutlier as tools
 - `apps/web`: local Next.js interface
-- `packages/core`: scoring, similarity, prompt grounding, shared domain logic
-- `packages/sdk`: typed TypeScript client for agent and app integrations
-- `packages/storage`: SQLite bootstrap and schema, structured to stay adapter-friendly
+- `packages/core`: scoring and similarity utilities
+- `packages/sdk`: typed TypeScript client
+- `packages/storage`: SQLite bootstrap and schema
 
 ## Requirements
 
 - Node.js `20+`
 - a YouTube Data API key
-- an OpenAI API key for text generation and embeddings
-- a Kie API key for `nano-banana-2` image generation
+- an API key for local auth
+- an OpenAI API key if you want embedding-backed topic similarity
 
 ## Quick start
 
 1. Copy `.env.example` to `.env`
-2. Fill in the required keys
+2. Fill in the required values
 3. Install dependencies with `npm install`
 4. Start the app with `npm run dev`
 5. Open [http://localhost:3000](http://localhost:3000)
-
-Start in `/projects` if you want the workflow-native surface first. The legacy `/collections` route now redirects there.
 
 Minimal `.env`:
 
@@ -64,7 +54,6 @@ Minimal `.env`:
 YOUTUBE_API_KEY=...
 API_KEY=...
 OPENAI_API_KEY=...
-KIE_API_KEY=...
 NEXT_PUBLIC_OPENOUTLIER_API_URL=http://localhost:3001
 NEXT_PUBLIC_OPENOUTLIER_API_KEY=...
 ```
@@ -76,96 +65,33 @@ NEXT_PUBLIC_OPENOUTLIER_API_KEY=...
 - `npm run lint`: lint API and web
 - `npm run test`: run core and API tests
 
-## Agent-first workflow
-
-The workflow engine is the core of the product. An agent can:
-
-- create a project
-- create or enrich source sets
-- discover competitor channels automatically
-- import a direct seed video
-- search and save references
-- generate adapted concepts
-- generate thumbnails from reference context and character profiles
-
-Key workflow endpoints:
+## API highlights
 
 - `POST /api/projects`
+- `POST /api/projects/:id/source-sets`
+- `POST /api/source-sets/:id/channels`
 - `POST /api/source-sets/:id/discover`
-- `POST /api/projects/:id/references/search`
+- `POST /api/scan`
+- `GET /api/discover/outliers`
+- `POST /api/projects/:id/references`
 - `POST /api/projects/:id/references/import-video`
-- `POST /api/projects/:id/concepts/generate`
-- `POST /api/projects/:id/thumbnails/generate`
-- `POST /api/workflow-runs`
-- `POST /api/workflow-runs/run-auto`
-- `POST /api/workflow-runs/:id/advance`
 
-More endpoint detail and example payloads live in [docs/API.md](docs/API.md).
-Agent usage guidance lives in [docs/AGENTS.md](docs/AGENTS.md).
-The machine-readable API contract lives in [docs/openapi.yaml](docs/openapi.yaml).
-Runnable integration examples live in [examples/agent-js.mjs](examples/agent-js.mjs) and [examples/agent-python.py](examples/agent-python.py).
-MCP configuration snippets live in [docs/MCP.md](docs/MCP.md).
+More detail lives in [docs/API.md](/Users/theograeser/Documents/outlier%20api/docs/API.md), with agent guidance in [docs/AGENTS.md](/Users/theograeser/Documents/outlier%20api/docs/AGENTS.md).
 
-## Packaging for agents
+## Agent integrations
 
-OpenOutlier can now be consumed four ways:
+OpenOutlier can be consumed four ways:
 
 - direct REST API
-- the typed TypeScript SDK in `packages/sdk`
+- the TypeScript SDK in `packages/sdk`
 - the MCP server in `apps/mcp`
-- the CLI agent in `apps/cli`
+- the CLI in `apps/cli`
 
-The MCP server uses:
+## Archived spike
 
-- `OPENOUTLIER_BASE_URL`
-- `OPENOUTLIER_API_KEY`
+The previous thumbnail/adaptation work has been archived outside this repo at:
 
-and exposes the workflow-native actions as tools such as project creation, channel discovery, reference import, concept generation, thumbnail generation, and `run_workflow_auto`.
-
-## Auth
-
-Every API endpoint except `GET /api/health` and local media under `/api/media/*` requires:
-
-```http
-x-api-key: your_api_key
-```
-
-The local UI uses `NEXT_PUBLIC_OPENOUTLIER_API_KEY` to talk to the API during development.
-
-## AI and image generation
-
-OpenAI is used for:
-- grounded idea generation
-- title generation
-- thumbnail briefs and adaptation summaries
-- topic embeddings for similar-topic search
-
-Kie `nano-banana-2` is used for:
-- face-sheet generation from uploaded reference photos
-- final thumbnail image generation from adapted concepts and references
-
-If no active OpenAI provider is saved in settings, the backend falls back to `OPENAI_API_KEY` from env.
-
-## Current OSS defaults
-
-- SQLite for local/self-hosted mode
-- single workspace, but schema is written to be workspace-ready
-- in-process scheduled scans for local use
-- BYO API keys instead of hosted credentials
-- workflow-first backend with compatibility routes kept during migration
-
-## MVP status
-
-This repo is ready for an open-source MVP release, but it is still an MVP:
-
-- hosted multi-tenant deployment is not finished
-- long-running jobs still run in-process locally
-- compatibility list routes still exist for older integrations, but the primary UI is now project-native
-- OAuth-based provider setup is not implemented yet
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+`/Users/theograeser/Documents/openoutlier-archive-2026-04-03/discovery-studio-spike`
 
 ## License
 

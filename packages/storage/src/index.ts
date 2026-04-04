@@ -336,6 +336,20 @@ export function createSqliteStorage(databasePath: string): SqliteStorage {
         updated_at TEXT DEFAULT CURRENT_TIMESTAMP
       );
 
+    `);
+
+    const tableHasColumn = (tableName: string, columnName: string) =>
+      (db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).some((column) => column.name === columnName);
+
+    if (!tableHasColumn("boards", "project_id")) {
+      db.exec("ALTER TABLE boards ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
+    }
+
+    if (!tableHasColumn("thumbnail_generations", "project_id")) {
+      db.exec("ALTER TABLE thumbnail_generations ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
+    }
+
+    db.exec(`
       CREATE INDEX IF NOT EXISTS idx_videos_outlier_score ON videos(outlier_score DESC);
       CREATE INDEX IF NOT EXISTS idx_videos_published_at ON videos(published_at DESC);
       CREATE INDEX IF NOT EXISTS idx_videos_channel_id ON videos(channel_id);
@@ -350,17 +364,6 @@ export function createSqliteStorage(databasePath: string): SqliteStorage {
       CREATE INDEX IF NOT EXISTS idx_project_references_project_id ON project_references(project_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_workflow_runs_project_id ON workflow_runs(project_id, updated_at DESC);
     `);
-
-    const tableHasColumn = (tableName: string, columnName: string) =>
-      (db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).some((column) => column.name === columnName);
-
-    if (!tableHasColumn("boards", "project_id")) {
-      db.exec("ALTER TABLE boards ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
-    }
-
-    if (!tableHasColumn("thumbnail_generations", "project_id")) {
-      db.exec("ALTER TABLE thumbnail_generations ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
-    }
 
     db.prepare(`
       INSERT INTO workspaces (id, name, slug)

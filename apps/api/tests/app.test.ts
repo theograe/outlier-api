@@ -14,9 +14,7 @@ describe("app auth and legacy list routes", () => {
     process.env.YOUTUBE_API_KEY = "test-youtube";
     process.env.API_KEY = "test-api-key";
     process.env.OPENAI_API_KEY = "test-openai";
-    process.env.KIE_API_KEY = "test-kie";
     process.env.DATABASE_PATH = databasePath;
-    process.env.OPENOUTLIER_MEDIA_ROOT = path.join(tempDir, "media");
 
     vi.stubGlobal("fetch", vi.fn(async () => {
       throw new Error("Unexpected network request in app test.");
@@ -48,27 +46,23 @@ describe("app auth and legacy list routes", () => {
     }
   }, 15000);
 
-  it("serves media safely without allowing path traversal", async () => {
-    fs.mkdirSync(path.join(tempDir, "media"), { recursive: true });
-    fs.writeFileSync(path.join(tempDir, "media", "thumb.png"), "ok");
-    fs.writeFileSync(path.join(tempDir, "secret.txt"), "nope");
-
+  it("serves health without auth and protects settings", async () => {
     const { buildApp } = await import("../src/app.js");
     const app = buildApp();
 
     try {
-      const allowed = await app.inject({
+      const health = await app.inject({
         method: "GET",
-        url: "/api/media/thumb.png",
+        url: "/api/health",
       });
-      expect(allowed.statusCode).toBe(200);
+      expect(health.statusCode).toBe(200);
 
       const blocked = await app.inject({
         method: "GET",
-        url: "/api/media/%2E%2E/secret.txt",
+        url: "/api/settings",
       });
-      expect([401, 403, 404]).toContain(blocked.statusCode);
-      expect(blocked.body).not.toContain("nope");
+
+      expect(blocked.statusCode).toBe(401);
     } finally {
       await app.close();
     }

@@ -2,11 +2,9 @@ import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ScanService } from "../services/scan-service.js";
 import { WorkflowService } from "../services/workflow-service.js";
-import { GoogleImageService } from "../services/google-image-service.js";
 
 export async function registerWorkflowRoutes(app: FastifyInstance, scanService: ScanService): Promise<void> {
   const workflows = new WorkflowService(scanService);
-  const images = new GoogleImageService();
 
   app.get("/api/projects", async () => workflows.listProjects());
 
@@ -142,108 +140,5 @@ export async function registerWorkflowRoutes(app: FastifyInstance, scanService: 
     const imported = await workflows.importReferenceVideo(projectId, body.sourceSetId ?? null, body.videoUrl ?? body.videoId ?? "");
     reply.code(201);
     return imported;
-  });
-
-  app.get("/api/projects/:id/concepts", async (request) => {
-    const projectId = Number((request.params as { id: string }).id);
-    return workflows.listConceptRuns(projectId);
-  });
-
-  app.get("/api/projects/:id/workflow-runs", async (request) => {
-    const projectId = Number((request.params as { id: string }).id);
-    return workflows.listWorkflowRuns(projectId);
-  });
-
-  app.get("/api/projects/:id/thumbnail-generations", async (request) => {
-    const projectId = Number((request.params as { id: string }).id);
-    return images.listGenerations(projectId);
-  });
-
-  app.post("/api/projects/:id/concepts/generate", async (request, reply) => {
-    const projectId = Number((request.params as { id: string }).id);
-    const body = z.object({
-      referenceIds: z.array(z.number().int()).optional(),
-      context: z.string().optional(),
-      providerId: z.number().int().optional(),
-    }).parse(request.body ?? {});
-
-    const concept = await workflows.generateConcept(projectId, body);
-    reply.code(201);
-    return concept;
-  });
-
-  app.post("/api/projects/:id/thumbnails/generate", async (request, reply) => {
-    const projectId = Number((request.params as { id: string }).id);
-    const body = z.object({
-      referenceIds: z.array(z.number().int()).optional(),
-      prompt: z.string().optional(),
-      context: z.string().optional(),
-      characterProfileId: z.number().int().optional().nullable(),
-      size: z.enum(["16:9", "3:2", "1:1", "2:3"]).default("16:9"),
-    }).parse(request.body ?? {});
-
-    const generation = await workflows.generateProjectThumbnail(projectId, body);
-    reply.code(201);
-    return generation;
-  });
-
-  app.post("/api/workflow-runs", async (request, reply) => {
-    const body = z.object({
-      projectId: z.number().int(),
-      sourceSetId: z.number().int().optional().nullable(),
-      mode: z.enum(["auto", "copilot", "manual"]).default("copilot"),
-      targetNiche: z.string().optional().nullable(),
-      targetChannelId: z.string().optional().nullable(),
-      startStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional(),
-      stopAfterStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional().nullable(),
-      referenceIds: z.array(z.number().int()).optional(),
-      seedVideoId: z.string().optional().nullable(),
-      seedVideoUrl: z.string().optional().nullable(),
-      input: z.record(z.string(), z.unknown()).default({}),
-      runImmediately: z.boolean().default(false),
-    }).parse(request.body ?? {});
-
-    const workflowRun = await workflows.createWorkflowRunAsync(body);
-    const result = body.runImmediately ? await workflows.advanceWorkflowRun(workflowRun.id, body.input) : workflowRun;
-    reply.code(201);
-    return result;
-  });
-
-  app.post("/api/workflow-runs/run-auto", async (request, reply) => {
-    const body = z.object({
-      projectId: z.number().int(),
-      sourceSetId: z.number().int().optional().nullable(),
-      targetNiche: z.string().optional().nullable(),
-      targetChannelId: z.string().optional().nullable(),
-      startStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional(),
-      stopAfterStage: z.enum(["source_discovery", "reference_research", "concept_adaptation", "thumbnail_creation"]).optional().nullable(),
-      referenceIds: z.array(z.number().int()).optional(),
-      seedVideoId: z.string().optional().nullable(),
-      seedVideoUrl: z.string().optional().nullable(),
-      input: z.record(z.string(), z.unknown()).default({}),
-    }).parse(request.body ?? {});
-
-    const workflowRun = await workflows.createWorkflowRunAsync({
-      ...body,
-      mode: "auto",
-    });
-    const result = await workflows.advanceWorkflowRun(workflowRun.id, body.input);
-    reply.code(201);
-    return result;
-  });
-
-  app.get("/api/workflow-runs/:id", async (request, reply) => {
-    const workflowRunId = Number((request.params as { id: string }).id);
-    try {
-      return workflows.getWorkflowRun(workflowRunId);
-    } catch {
-      return reply.notFound("Workflow run not found.");
-    }
-  });
-
-  app.post("/api/workflow-runs/:id/advance", async (request) => {
-    const workflowRunId = Number((request.params as { id: string }).id);
-    const body = z.record(z.string(), z.unknown()).default({}).parse(request.body ?? {});
-    return workflows.advanceWorkflowRun(workflowRunId, body);
   });
 }

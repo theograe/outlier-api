@@ -4,9 +4,6 @@ export type OpenOutlierClientOptions = {
   fetch?: typeof fetch;
 };
 
-export type WorkflowMode = "auto" | "copilot" | "manual";
-export type WorkflowStage = "source_discovery" | "reference_research" | "concept_adaptation" | "thumbnail_creation";
-
 export type Project = {
   id: number;
   name: string;
@@ -16,24 +13,8 @@ export type Project = {
   primaryChannelName: string | null;
   sourceSetCount: number;
   referenceCount: number;
-  workflowRunCount: number;
   createdAt: string;
   updatedAt: string;
-};
-
-export type WorkflowRun = {
-  id: number;
-  projectId: number;
-  sourceSetId: number | null;
-  mode: WorkflowMode;
-  status: string;
-  currentStage: string;
-  input: Record<string, unknown>;
-  output: Record<string, unknown>;
-  lastError: string | null;
-  createdAt: string;
-  updatedAt: string;
-  completedAt: string | null;
 };
 
 export class OpenOutlierClient {
@@ -150,98 +131,14 @@ export class OpenOutlierClient {
     });
   }
 
-  listConcepts(projectId: number) {
-    return this.request<Record<string, unknown>[]>(`/api/projects/${projectId}/concepts`);
-  }
-
-  generateConcept(projectId: number, input: { referenceIds?: number[]; context?: string; providerId?: number }) {
-    return this.request<Record<string, unknown>>(`/api/projects/${projectId}/concepts/generate`, {
+  triggerScan(listId?: number) {
+    return this.request<Record<string, unknown>>("/api/scan", {
       method: "POST",
-      body: JSON.stringify(input),
+      body: JSON.stringify(listId ? { listId } : {}),
     });
   }
 
-  generateThumbnail(projectId: number, input: {
-    referenceIds?: number[];
-    prompt?: string;
-    context?: string;
-    characterProfileId?: number | null;
-    size?: "16:9" | "3:2" | "1:1" | "2:3";
-  }) {
-    return this.request<Record<string, unknown>>(`/api/projects/${projectId}/thumbnails/generate`, {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-
-  listWorkflowRuns(projectId: number) {
-    return this.request<WorkflowRun[]>(`/api/projects/${projectId}/workflow-runs`);
-  }
-
-  getWorkflowRun(workflowRunId: number) {
-    return this.request<WorkflowRun>(`/api/workflow-runs/${workflowRunId}`);
-  }
-
-  createWorkflowRun(input: {
-    projectId: number;
-    sourceSetId?: number | null;
-    mode?: WorkflowMode;
-    targetNiche?: string | null;
-    targetChannelId?: string | null;
-    startStage?: WorkflowStage;
-    stopAfterStage?: WorkflowStage | null;
-    referenceIds?: number[];
-    seedVideoId?: string | null;
-    seedVideoUrl?: string | null;
-    input?: Record<string, unknown>;
-    runImmediately?: boolean;
-  }) {
-    return this.request<WorkflowRun>("/api/workflow-runs", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-
-  runWorkflowAuto(input: {
-    projectId: number;
-    sourceSetId?: number | null;
-    targetNiche?: string | null;
-    targetChannelId?: string | null;
-    startStage?: WorkflowStage;
-    stopAfterStage?: WorkflowStage | null;
-    referenceIds?: number[];
-    seedVideoId?: string | null;
-    seedVideoUrl?: string | null;
-    input?: Record<string, unknown>;
-  }) {
-    return this.request<WorkflowRun>("/api/workflow-runs/run-auto", {
-      method: "POST",
-      body: JSON.stringify(input),
-    });
-  }
-
-  advanceWorkflowRun(workflowRunId: number, input?: Record<string, unknown>) {
-    return this.request<WorkflowRun>(`/api/workflow-runs/${workflowRunId}/advance`, {
-      method: "POST",
-      body: JSON.stringify(input ?? {}),
-    });
-  }
-
-  async runSeedVideoWorkflow(input: {
-    projectId: number;
-    sourceSetId?: number | null;
-    seedVideoUrl: string;
-    adaptationContext?: string;
-    stopAfterStage?: WorkflowStage | null;
-  }) {
-    return this.runWorkflowAuto({
-      projectId: input.projectId,
-      sourceSetId: input.sourceSetId,
-      seedVideoUrl: input.seedVideoUrl,
-      stopAfterStage: input.stopAfterStage ?? "concept_adaptation",
-      input: {
-        adaptationContext: input.adaptationContext,
-      },
-    });
+  getScanStatus() {
+    return this.request<Record<string, unknown>>("/api/scan/status");
   }
 }

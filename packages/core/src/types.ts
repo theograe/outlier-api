@@ -31,35 +31,3 @@ export type SavedOutlierInput = {
   tags?: string[];
   listId?: number | null;
 };
-
-export type IdeaGenerationKind =
-  | "idea"
-  | "title_set"
-  | "thumbnail_brief"
-  | "hook_angles"
-  | "channel_strategy_summary";
-
-export type LlmProviderMode = "api_key" | "oauth";
-
-export type LlmProviderConfig = {
-  id: number;
-  name: string;
-  provider: "openai" | "anthropic" | "openrouter";
-  mode: LlmProviderMode;
-  apiKey: string | null;
-  oauthConfigJson: string | null;
-  model: string | null;
-  isActive: number;
-};
-
-export type PromptSourceVideo = Pick<
-  DiscoverVideo,
-  | "videoId"
-  | "title"
-  | "channelName"
-  | "views"
-  | "outlierScore"
-  | "viewVelocity"
-  | "lists"
-  | "publishedAt"
->;

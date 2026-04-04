@@ -1,7 +1,6 @@
 import { computeMomentumScore, getScoreBand, parseDurationToSeconds, similarityScore, titleFormat } from "@openoutlier/core";
 import { db, getSetting } from "../db.js";
 import { EmbeddingsService } from "./embeddings-service.js";
-import { GoogleImageService } from "./google-image-service.js";
 
 export type DiscoverQuery = {
   listId?: number;
@@ -28,7 +27,6 @@ export type DiscoverQuery = {
 };
 
 const embeddingsService = new EmbeddingsService();
-const thumbnailService = new GoogleImageService();
 const orderMap = {
   asc: "ASC",
   desc: "DESC",
@@ -213,50 +211,6 @@ export async function getSimilarTopics(videoId: string, limit = 12) {
     .filter((candidate) => candidate.similarity > 0)
     .sort((left, right) => right.similarity - left.similarity)
     .slice(0, limit);
-}
-
-export async function getSimilarThumbnails(videoId: string, limit = 12) {
-  const seed = db.prepare("SELECT id, title, thumbnail_url, content_type FROM videos WHERE id = ?").get(videoId) as
-    | { id: string; title: string; thumbnail_url: string | null; content_type: string }
-    | undefined;
-  if (!seed) {
-    return null;
-  }
-
-  const candidates = db
-    .prepare(`
-      SELECT
-        videos.id AS videoId,
-        videos.title,
-        videos.thumbnail_url AS thumbnailUrl,
-        videos.content_type AS contentType,
-        videos.outlier_score AS outlierScore,
-        channels.name AS channelName
-      FROM videos
-      INNER JOIN channels ON channels.id = videos.channel_id
-      WHERE videos.id != ?
-      ORDER BY videos.outlier_score DESC
-      LIMIT 250
-    `)
-    .all(videoId) as Array<Record<string, unknown>>;
-
-  const candidateIds = candidates.map((candidate) => String(candidate.videoId));
-  const imageScores = await thumbnailService.getThumbnailSimilarity(videoId, candidateIds);
-
-  return {
-    mode: imageScores ? "perceptual-hash" : "heuristic",
-    items: candidates
-      .map((candidate) => ({
-        ...candidate,
-        similarity:
-          imageScores?.get(String(candidate.videoId)) ??
-          (similarityScore(seed.title, String(candidate.title)) +
-            (seed.content_type === candidate.contentType ? 0.25 : 0)),
-      }))
-      .filter((candidate) => candidate.similarity > 0.1)
-      .sort((left, right) => right.similarity - left.similarity)
-      .slice(0, limit),
-  };
 }
 
 export function getNiches(days: number, limit = 25) {

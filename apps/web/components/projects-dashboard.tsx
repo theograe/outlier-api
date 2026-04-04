@@ -12,7 +12,6 @@ type ProjectSummary = {
   primaryChannelName: string | null;
   sourceSetCount: number;
   referenceCount: number;
-  workflowRunCount: number;
 };
 
 type ProjectDetail = {
@@ -36,8 +35,9 @@ type ProjectDetail = {
     videoId: string;
     title: string;
     channelName: string;
-    thumbnailUrl: string | null;
     outlierScore: number;
+    viewVelocity: number;
+    views: number;
     kind: string;
     notes: string | null;
     tags: string[];
@@ -57,7 +57,6 @@ type SourceSetDetail = {
     name: string;
     handle: string | null;
     subscriberCount: number | null;
-    thumbnailUrl: string | null;
   }>;
 };
 
@@ -69,33 +68,36 @@ type DiscoveryResult = {
     channelName: string;
     handle: string | null;
     subscriberCount: number;
-    thumbnailUrl: string | null;
   }>;
   attachedCount: number;
 };
 
-type WorkflowRun = {
-  id: number;
-  status: string;
-  currentStage: string;
-  output: Record<string, unknown>;
-  completedAt: string | null;
+type ScanStatus = {
+  running: boolean;
+  currentRun: {
+    listId: number | null;
+    startedAt: string;
+    progressCurrent: number;
+    progressTotal: number;
+    message?: string | null;
+  } | null;
+  lastRun: {
+    status: string;
+    listId: number | null;
+    startedAt: string;
+    completedAt: string | null;
+    progressCurrent: number;
+    progressTotal: number;
+    message?: string | null;
+  } | null;
 };
-
-function conceptSummary(output: Record<string, unknown> | undefined) {
-  const stage = output?.concept_adaptation;
-  if (!stage || typeof stage !== "object") return null;
-  const concept = (stage as Record<string, unknown>).concept;
-  if (!concept || typeof concept !== "object") return null;
-  return concept as Record<string, unknown>;
-}
 
 export function ProjectsDashboard() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [selectedProject, setSelectedProject] = useState<ProjectDetail | null>(null);
   const [selectedSourceSet, setSelectedSourceSet] = useState<SourceSetDetail | null>(null);
   const [discovery, setDiscovery] = useState<DiscoveryResult | null>(null);
-  const [latestWorkflow, setLatestWorkflow] = useState<WorkflowRun | null>(null);
+  const [scanStatus, setScanStatus] = useState<ScanStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -106,9 +108,6 @@ export function ProjectsDashboard() {
   const [discoveryQuery, setDiscoveryQuery] = useState("");
   const [sourceSetName, setSourceSetName] = useState("");
   const [seedVideoUrl, setSeedVideoUrl] = useState("");
-  const [adaptationContext, setAdaptationContext] = useState("");
-
-  const selectedSourceSetId = selectedSourceSet?.id ?? selectedProject?.sourceSets[0]?.id ?? null;
 
   async function hydrateProject(projectId: number) {
     const detail = await apiFetch<ProjectDetail>(`/api/projects/${projectId}`);
@@ -135,6 +134,7 @@ export function ProjectsDashboard() {
         setSelectedProject(null);
         setSelectedSourceSet(null);
       }
+      setScanStatus(await apiFetch<ScanStatus>("/api/scan/status"));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Failed to load projects.");
     } finally {
@@ -246,27 +246,39 @@ export function ProjectsDashboard() {
     }
   }
 
-  async function runSeedWorkflow() {
-    if (!selectedProject || !selectedSourceSetId || !seedVideoUrl.trim()) return;
+  async function runSourceSetScan() {
+    if (!selectedSourceSet?.backingListId) return;
     setLoading(true);
     setError(null);
     try {
-      const workflow = await apiFetch<WorkflowRun>("/api/workflow-runs/run-auto", {
+      await apiFetch("/api/scan", {
+        method: "POST",
+        body: JSON.stringify({ listId: selectedSourceSet.backingListId }),
+      });
+      setScanStatus(await apiFetch<ScanStatus>("/api/scan/status"));
+    } catch (scanError) {
+      setError(scanError instanceof Error ? scanError.message : "Failed to start scan.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function importSeedVideo() {
+    if (!selectedProject || !seedVideoUrl.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await apiFetch(`/api/projects/${selectedProject.id}/references/import-video`, {
         method: "POST",
         body: JSON.stringify({
-          projectId: selectedProject.id,
-          sourceSetId: selectedSourceSetId,
-          seedVideoUrl: seedVideoUrl.trim(),
-          stopAfterStage: "concept_adaptation",
-          input: {
-            adaptationContext: adaptationContext.trim() || selectedProject.niche || "Adapt this outlier for the target niche and generate titles plus thumbnail direction.",
-          },
+          sourceSetId: selectedSourceSet?.id ?? null,
+          videoUrl: seedVideoUrl.trim(),
         }),
       });
-      setLatestWorkflow(workflow);
+      setSeedVideoUrl("");
       await hydrateProject(selectedProject.id);
-    } catch (workflowError) {
-      setError(workflowError instanceof Error ? workflowError.message : "Failed to run workflow.");
+    } catch (importError) {
+      setError(importError instanceof Error ? importError.message : "Failed to import video.");
     } finally {
       setLoading(false);
     }
@@ -277,32 +289,30 @@ export function ProjectsDashboard() {
     [projects, selectedProject?.id],
   );
 
-  const latestConcept = conceptSummary(latestWorkflow?.output);
-
   return (
     <div className="stack">
       <header className="page-header">
         <div>
           <div className="eyebrow">Projects</div>
-          <h1 className="headline">Run OpenOutlier like a workflow engine</h1>
-          <p className="subtle">Projects and source sets are the new control plane for agent-driven research, adaptation, and thumbnail creation.</p>
+          <h1 className="headline">Set up your niche and track the right channels</h1>
+          <p className="subtle">Create a project, add competitor channels, run scans, and keep the best outlier references in one place.</p>
         </div>
       </header>
 
-      {error ? <section className="panel" style={{ borderColor: "rgba(255, 127, 102, 0.4)", color: "#ffd7d0" }}>{error}</section> : null}
+      {error ? <section className="panel" style={{ borderColor: "var(--line-strong)", color: "var(--text)" }}>{error}</section> : null}
 
       <section className="panel">
         <div className="form-grid">
           <label className="field">
             <span>Project name</span>
-            <input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Editing Ideas Lab" />
+            <input value={projectName} onChange={(event) => setProjectName(event.target.value)} placeholder="Editing education" />
           </label>
           <label className="field">
             <span>Niche</span>
-            <input value={projectNiche} onChange={(event) => setProjectNiche(event.target.value)} placeholder="English editing education" />
+            <input value={projectNiche} onChange={(event) => setProjectNiche(event.target.value)} placeholder="English video editing tutorials" />
           </label>
           <label className="field">
-            <span>Primary channel</span>
+            <span>Your channel</span>
             <input value={primaryChannelInput} onChange={(event) => setPrimaryChannelInput(event.target.value)} placeholder="@yourchannel or youtube.com/@yourchannel" />
           </label>
           <div className="field" style={{ alignSelf: "end" }}>
@@ -327,11 +337,11 @@ export function ProjectsDashboard() {
                 </div>
                 <div className="metrics">
                   <span className="pill">{project.sourceSetCount} sets</span>
-                  <span className="pill">{project.referenceCount} refs</span>
+                  <span className="pill">{project.referenceCount} saved</span>
                 </div>
               </button>
             ))}
-            {projects.length === 0 && !loading ? <div className="subtle">Create your first project to start tracking channels and running workflows.</div> : null}
+            {projects.length === 0 && !loading ? <div className="subtle">Create your first project to start tracking channels.</div> : null}
           </div>
         </section>
 
@@ -347,7 +357,7 @@ export function ProjectsDashboard() {
               </div>
 
               <label className="field">
-                <span>Create another source set</span>
+                <span>New source set</span>
                 <div className="toolbar">
                   <input value={sourceSetName} onChange={(event) => setSourceSetName(event.target.value)} placeholder="Short-form editors" />
                   <button className="button secondary" disabled={loading} onClick={() => void createSourceSet()}>Add set</button>
@@ -382,12 +392,24 @@ export function ProjectsDashboard() {
                     </div>
                     <div className="toolbar" style={{ marginTop: 10 }}>
                       <label className="field">
-                        <span>Discover competitors automatically</span>
+                        <span>Find more channels automatically</span>
                         <input value={discoveryQuery} onChange={(event) => setDiscoveryQuery(event.target.value)} placeholder={selectedProject.niche ?? "premiere pro tutorials"} />
                       </label>
                       <div className="field" style={{ alignSelf: "end" }}>
                         <button className="button secondary" disabled={loading} onClick={() => void discoverChannels()}>Find channels</button>
                       </div>
+                    </div>
+                    <div className="toolbar" style={{ marginTop: 10 }}>
+                      <button className="button secondary" disabled={loading || !selectedSourceSet.backingListId} onClick={() => void runSourceSetScan()}>
+                        Scan this source set
+                      </button>
+                      {scanStatus?.currentRun ? (
+                        <div className="subtle">
+                          Running · {scanStatus.currentRun.progressCurrent}/{scanStatus.currentRun.progressTotal}
+                        </div>
+                      ) : (
+                        <div className="subtle">{scanStatus?.lastRun ? `Last scan: ${scanStatus.lastRun.status}` : "No scan running"}</div>
+                      )}
                     </div>
                     <div className="list" style={{ marginTop: 14 }}>
                       {selectedSourceSet.channels.map((channel) => (
@@ -428,7 +450,7 @@ export function ProjectsDashboard() {
               )}
             </div>
           ) : (
-            <div className="subtle">Select a project to manage sources, references, and workflow runs.</div>
+            <div className="subtle">Select a project to manage channels and saved references.</div>
           )}
         </section>
       </div>
@@ -436,37 +458,23 @@ export function ProjectsDashboard() {
       {selectedProject ? (
         <div className="grid-2" style={{ gridTemplateColumns: "minmax(0, 1.1fr) minmax(320px, 0.9fr)" }}>
           <section className="panel">
-            <div className="eyebrow">Agent runner</div>
-            <h2 style={{ marginTop: 8 }}>Start from one reference video</h2>
-            <p className="subtle">This is the shortest path for an external agent: ingest a single YouTube video, adapt it for the niche, and return final ideas, titles, and thumbnail direction.</p>
-            <div className="form-grid">
-              <label className="field filter-span-2">
-                <span>Seed video URL</span>
+            <div className="eyebrow">Import one video</div>
+            <h2 style={{ marginTop: 8 }}>Save a proven reference directly</h2>
+            <p className="subtle">If you already know one strong outlier, paste it here and save it into the project without scanning first.</p>
+            <div className="toolbar">
+              <label className="field" style={{ flex: 1 }}>
+                <span>YouTube video URL</span>
                 <input value={seedVideoUrl} onChange={(event) => setSeedVideoUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
               </label>
-              <label className="field filter-span-2">
-                <span>Adaptation context</span>
-                <textarea rows={4} value={adaptationContext} onChange={(event) => setAdaptationContext(event.target.value)} placeholder="Adapt this for editing educators who want high-CTR service-led content." />
-              </label>
               <div className="field" style={{ alignSelf: "end" }}>
-                <button className="button" disabled={loading} onClick={() => void runSeedWorkflow()}>Run workflow</button>
+                <button className="button" disabled={loading} onClick={() => void importSeedVideo()}>Save reference</button>
               </div>
             </div>
-
-            {latestConcept ? (
-              <div className="panel alt" style={{ marginTop: 16 }}>
-                <div className="eyebrow">Latest concept run</div>
-                <div className="subtle" style={{ marginTop: 8 }}>Workflow #{latestWorkflow?.id} • {latestWorkflow?.status}</div>
-                {"idea" in latestConcept ? <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(latestConcept.idea, null, 2)}</pre> : null}
-                {"titles" in latestConcept ? <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(latestConcept.titles, null, 2)}</pre> : null}
-                {"thumbnailBrief" in latestConcept ? <pre style={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(latestConcept.thumbnailBrief, null, 2)}</pre> : null}
-              </div>
-            ) : null}
           </section>
 
           <section className="panel alt">
-            <div className="eyebrow">Recent references</div>
-            <h2 style={{ marginTop: 8 }}>Saved inspiration</h2>
+            <div className="eyebrow">Saved references</div>
+            <h2 style={{ marginTop: 8 }}>What you’ve kept</h2>
             <div className="list">
               {selectedProject.references.map((reference) => (
                 <div key={reference.id} className="list-row">
@@ -480,7 +488,7 @@ export function ProjectsDashboard() {
                   </div>
                 </div>
               ))}
-              {selectedProject.references.length === 0 ? <div className="subtle">No references yet. Run a workflow or save outliers from Discover.</div> : null}
+              {selectedProject.references.length === 0 ? <div className="subtle">No saved references yet. Scan channels or import a video to start building your set.</div> : null}
             </div>
           </section>
         </div>

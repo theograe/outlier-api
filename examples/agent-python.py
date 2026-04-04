@@ -8,19 +8,18 @@ project_id = int(os.getenv("OPENOUTLIER_PROJECT_ID", "1"))
 source_set_id = os.getenv("OPENOUTLIER_SOURCE_SET_ID")
 
 payload = {
-    "projectId": project_id,
-    "seedVideoUrl": "https://www.youtube.com/watch?v=abc123xyz89",
-    "stopAfterStage": "concept_adaptation",
-    "input": {
-        "adaptationContext": "Adapt this for editing educators and return the best idea, titles, and thumbnail direction."
-    }
+    "contentType": "long",
+    "days": 365,
+    "minScore": 3,
+    "sort": "momentum",
+    "limit": 10,
 }
 
 if source_set_id:
     payload["sourceSetId"] = int(source_set_id)
 
 response = requests.post(
-    f"{base_url}/api/workflow-runs/run-auto",
+    f"{base_url}/api/projects/{project_id}/references/search",
     headers={
         "x-api-key": api_key,
         "Content-Type": "application/json",
