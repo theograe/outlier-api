@@ -23,19 +23,30 @@ export async function registerChannelRoutes(app: FastifyInstance): Promise<void>
       return reply.notFound("Channel not found.");
     }
 
-    const lists = db
+    const projects = db
       .prepare(`
-        SELECT lists.id, lists.name
-        FROM lists
-        INNER JOIN list_channels ON list_channels.list_id = lists.id
-        WHERE list_channels.channel_id = ?
-        ORDER BY lists.name
+        SELECT projects.id, projects.name, project_channels.relationship
+        FROM projects
+        INNER JOIN project_channels ON project_channels.project_id = projects.id
+        WHERE project_channels.channel_id = ?
+        ORDER BY projects.name
+      `)
+      .all(id);
+
+    const sourceSets = db
+      .prepare(`
+        SELECT source_sets.id, source_sets.name, source_sets.role, source_set_channels.relationship
+        FROM source_sets
+        INNER JOIN source_set_channels ON source_set_channels.source_set_id = source_sets.id
+        WHERE source_set_channels.channel_id = ?
+        ORDER BY source_sets.name
       `)
       .all(id);
 
     return {
       ...channel,
-      lists,
+      projects,
+      sourceSets,
       patternSummary: getChannelPatterns(id),
       relatedChannels: getRelatedChannels(id),
     };

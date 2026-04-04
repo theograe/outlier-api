@@ -22,7 +22,7 @@ export type DiscoverVideo = {
   contentType: "long" | "short";
   scoreBand: ScoreBand;
   lists: string[];
-  savedOutlierId?: number | null;
+  projectReferenceId?: number | null;
 };
 
 export type SavedOutlierInput = {

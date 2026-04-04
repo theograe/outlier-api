@@ -2,9 +2,11 @@ import { z } from "zod";
 import type { FastifyInstance } from "fastify";
 import type { ScanService } from "../services/scan-service.js";
 import { WorkflowService } from "../services/workflow-service.js";
+import { GoogleImageService } from "../services/google-image-service.js";
 
 export async function registerWorkflowRoutes(app: FastifyInstance, scanService: ScanService): Promise<void> {
   const workflows = new WorkflowService(scanService);
+  const images = new GoogleImageService();
 
   app.get("/api/projects", async () => workflows.listProjects());
 
@@ -145,6 +147,16 @@ export async function registerWorkflowRoutes(app: FastifyInstance, scanService: 
   app.get("/api/projects/:id/concepts", async (request) => {
     const projectId = Number((request.params as { id: string }).id);
     return workflows.listConceptRuns(projectId);
+  });
+
+  app.get("/api/projects/:id/workflow-runs", async (request) => {
+    const projectId = Number((request.params as { id: string }).id);
+    return workflows.listWorkflowRuns(projectId);
+  });
+
+  app.get("/api/projects/:id/thumbnail-generations", async (request) => {
+    const projectId = Number((request.params as { id: string }).id);
+    return images.listGenerations(projectId);
   });
 
   app.post("/api/projects/:id/concepts/generate", async (request, reply) => {

@@ -20,17 +20,33 @@ type Video = {
   publishedAt?: string | null;
 };
 
-type Board = { id: number; name: string };
+type Project = {
+  id: number;
+  name: string;
+  niche: string | null;
+  sourceSetCount: number;
+  referenceCount: number;
+};
+
+type ProjectDetail = {
+  id: number;
+  name: string;
+  niche: string | null;
+  sourceSets: Array<{ id: number; name: string; role: string; channelCount: number }>;
+};
+
+type Board = { id: number; name: string; project_id?: number | null };
 type Provider = { id: number; name: string; provider: string };
 type SimilarItem = { videoId: string; title: string; channelName: string; similarity: number; thumbnailUrl?: string | null; mode?: string };
 type ThumbnailGeneration = { id: number; status: string; resultUrls: string[]; downloadUrls: string[] };
 type CharacterProfile = { id: number; name: string; faceSheetUrl: string | null; isDefault: boolean };
-type Collection = { id: number; name: string; description?: string | null; channel_count?: number };
 type DiscoverResponse = { videos: Video[]; total: number };
+type ConceptRunResponse = { id: number; model: string | null; concept: Record<string, unknown> };
 
 type FilterState = {
   search: string;
-  listId: string;
+  projectId: string;
+  sourceSetId: string;
   contentType: "all" | "long" | "short";
   minScore: string;
   maxScore: string;
@@ -60,7 +76,8 @@ const STORAGE_KEY = "openoutlier.discover-presets";
 
 const defaultFilters: FilterState = {
   search: "",
-  listId: "1",
+  projectId: "",
+  sourceSetId: "",
   contentType: "all",
   minScore: "3",
   maxScore: "",
@@ -108,10 +125,12 @@ function writePresets(presets: SavedPreset[]) {
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
 }
 
-function activeFilterSummary(filters: FilterState, collections: Collection[]): string[] {
+function activeFilterSummary(filters: FilterState, projects: Project[], projectDetail: ProjectDetail | null): string[] {
   const summary: string[] = [];
-  const selectedCollection = collections.find((collection) => String(collection.id) === filters.listId);
-  if (selectedCollection) summary.push(selectedCollection.name);
+  const selectedProject = projects.find((project) => String(project.id) === filters.projectId);
+  const selectedSourceSet = projectDetail?.sourceSets.find((sourceSet) => String(sourceSet.id) === filters.sourceSetId);
+  if (selectedProject) summary.push(selectedProject.name);
+  if (selectedSourceSet) summary.push(selectedSourceSet.name);
   if (filters.search) summary.push(`Search: ${filters.search}`);
   if (filters.contentType !== "all") summary.push(filters.contentType === "short" ? "Shorts" : "Long-form");
   if (filters.minScore) summary.push(`Min score ${filters.minScore}x`);
@@ -131,7 +150,8 @@ export default function DiscoverPage() {
   const [boards, setBoards] = useState<Board[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [profiles, setProfiles] = useState<CharacterProfile[]>([]);
-  const [collections, setCollections] = useState<Collection[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectDetail, setProjectDetail] = useState<ProjectDetail | null>(null);
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>([]);
   const [selected, setSelected] = useState<Video | null>(null);
   const [similarTopics, setSimilarTopics] = useState<SimilarItem[]>([]);
@@ -155,7 +175,8 @@ export default function DiscoverPage() {
     });
 
     if (filters.search) params.set("search", filters.search);
-    if (filters.listId) params.set("listId", filters.listId);
+    if (filters.projectId) params.set("projectId", filters.projectId);
+    if (filters.sourceSetId) params.set("sourceSetId", filters.sourceSetId);
     if (filters.maxScore) params.set("maxScore", filters.maxScore);
     if (filters.minViews) params.set("minViews", filters.minViews);
     if (filters.maxViews) params.set("maxViews", filters.maxViews);
@@ -174,29 +195,55 @@ export default function DiscoverPage() {
   }, []);
 
   useEffect(() => {
-    setLoading(true);
-    setError("");
     void Promise.all([
-      apiFetch<DiscoverResponse>(`/api/discover/outliers?${query}`),
-      apiFetch<Board[]>("/api/boards"),
+      apiFetch<Project[]>("/api/projects"),
       apiFetch<Provider[]>("/api/settings/llm-providers"),
       apiFetch<CharacterProfile[]>("/api/character-profiles"),
-      apiFetch<Collection[]>("/api/collections"),
-    ])
-      .then(([discover, boardRows, providerRows, profileRows, collectionRows]) => {
+    ]).then(([projectRows, providerRows, profileRows]) => {
+      setProjects(projectRows);
+      setProviders(providerRows);
+      setProfiles(profileRows);
+      setCharacterProfileId(profileRows.find((profile) => profile.isDefault)?.id?.toString() ?? "");
+      setFilters((current) => {
+        if (current.projectId || projectRows.length === 0) return current;
+        const editors = projectRows.find((project) => project.name.toLowerCase().includes("edit"));
+        return editors ? { ...current, projectId: String(editors.id) } : { ...current, projectId: String(projectRows[0].id) };
+      });
+    }).catch((fetchError) => setError(fetchError instanceof Error ? fetchError.message : "Failed to load projects."));
+  }, []);
+
+  useEffect(() => {
+    if (!filters.projectId) {
+      setProjectDetail(null);
+      setBoards([]);
+      return;
+    }
+
+    void Promise.all([
+      apiFetch<ProjectDetail>(`/api/projects/${filters.projectId}`),
+      apiFetch<Board[]>(`/api/boards?projectId=${filters.projectId}`),
+    ]).then(([detail, boardRows]) => {
+      setProjectDetail(detail);
+      setBoards(boardRows);
+      setFilters((current) => {
+        if (current.projectId !== String(detail.id)) return current;
+        if (current.sourceSetId && detail.sourceSets.some((sourceSet) => String(sourceSet.id) === current.sourceSetId)) return current;
+        return {
+          ...current,
+          sourceSetId: detail.sourceSets[0] ? String(detail.sourceSets[0].id) : "",
+        };
+      });
+    }).catch((fetchError) => setError(fetchError instanceof Error ? fetchError.message : "Failed to load project detail."));
+  }, [filters.projectId]);
+
+  useEffect(() => {
+    setLoading(true);
+    setError("");
+    void apiFetch<DiscoverResponse>(`/api/discover/outliers?${query}`)
+      .then((discover) => {
         setVideos(discover.videos);
         setTotal(discover.total);
-        setBoards(boardRows);
-        setProviders(providerRows);
-        setProfiles(profileRows);
-        setCollections(collectionRows);
-        setCharacterProfileId(profileRows.find((profile) => profile.isDefault)?.id?.toString() ?? "");
         setSelected((current) => discover.videos.find((video) => video.videoId === current?.videoId) ?? discover.videos[0] ?? null);
-        setFilters((current) => {
-          if (current.listId || collectionRows.length === 0) return current;
-          const editors = collectionRows.find((collection) => collection.name.toLowerCase() === "editors");
-          return editors ? { ...current, listId: String(editors.id) } : current;
-        });
       })
       .catch((fetchError) => setError(fetchError instanceof Error ? fetchError.message : "Failed to load discover feed."))
       .finally(() => setLoading(false));
@@ -227,13 +274,19 @@ export default function DiscoverPage() {
   }, [selected]);
 
   function updateFilter<K extends keyof FilterState>(key: K, value: FilterState[K]) {
-    setFilters((current) => ({ ...current, [key]: value }));
+    setFilters((current) => {
+      if (key === "projectId") {
+        return { ...current, projectId: value as string, sourceSetId: "" };
+      }
+      return { ...current, [key]: value };
+    });
   }
 
   function resetFilters() {
     setFilters((current) => ({
       ...defaultFilters,
-      listId: current.listId || defaultFilters.listId,
+      projectId: current.projectId || defaultFilters.projectId,
+      sourceSetId: current.sourceSetId || defaultFilters.sourceSetId,
     }));
   }
 
@@ -261,12 +314,17 @@ export default function DiscoverPage() {
   }
 
   async function saveSelected() {
-    if (!selected) return;
-    await apiFetch("/api/saved-outliers", {
+    if (!selected || !filters.projectId) return;
+    await apiFetch(`/api/projects/${filters.projectId}/references`, {
       method: "POST",
-      body: JSON.stringify({ videoId: selected.videoId, tags: ["discover"] }),
+      body: JSON.stringify({
+        sourceSetId: filters.sourceSetId ? Number(filters.sourceSetId) : null,
+        videoId: selected.videoId,
+        kind: "outlier",
+        tags: ["discover", "manual-save"],
+      }),
     });
-    setResultText("Saved to research.");
+    setResultText("Saved as a project reference.");
   }
 
   async function addToBoard(boardId: number) {
@@ -278,24 +336,26 @@ export default function DiscoverPage() {
     setResultText("Added to board.");
   }
 
-  async function generate(kind: "ideas" | "titles" | "thumbnail") {
-    if (!selected) return;
-    const path = kind === "ideas" ? "/api/ideas/generate" : kind === "titles" ? "/api/titles/generate" : "/api/thumbnails/generate-brief";
-    const result = await apiFetch<{ output: string }>(path, {
+  async function generateConcept() {
+    if (!selected || !filters.projectId) return;
+    const result = await apiFetch<ConceptRunResponse>(`/api/projects/${filters.projectId}/concepts/generate`, {
       method: "POST",
-      body: JSON.stringify({ sourceVideoIds: [selected.videoId], context: `Use ${selected.channelName} as the audience reference.` }),
+      body: JSON.stringify({
+        context: projectDetail?.niche
+          ? `Adapt this outlier for ${projectDetail.niche}. Keep the packaging native to ${selected.channelName} level YouTube performance.`
+          : `Adapt this outlier for the current niche. Keep the packaging native to ${selected.channelName} level YouTube performance.`,
+      }),
     });
-    setResultText(result.output);
+    setResultText(JSON.stringify(result.concept, null, 2));
   }
 
   async function generateThumbnail() {
-    if (!selected) return;
+    if (!selected || !filters.projectId) return;
     setError("");
     try {
-      const result = await apiFetch<ThumbnailGeneration>("/api/thumbnails/generate", {
+      const result = await apiFetch<ThumbnailGeneration>(`/api/projects/${filters.projectId}/thumbnails/generate`, {
         method: "POST",
         body: JSON.stringify({
-          sourceVideoIds: [selected.videoId],
           prompt: thumbnailPrompt,
           context: `Use ${selected.channelName} as the reference creator and keep the packaging native to YouTube.`,
           characterProfileId: characterProfileId ? Number(characterProfileId) : null,
@@ -308,7 +368,7 @@ export default function DiscoverPage() {
     }
   }
 
-  const summary = activeFilterSummary(filters, collections);
+  const summary = activeFilterSummary(filters, projects, projectDetail);
   const gridStyle =
     filters.viewMode === "thumbnails"
       ? { gridTemplateColumns: `repeat(${Math.max(1, filters.columns)}, minmax(0, 1fr))` }
@@ -320,7 +380,7 @@ export default function DiscoverPage() {
         <div>
           <div className="eyebrow">Discover</div>
           <h1 className="headline">Track breakout packaging before it goes stale</h1>
-          <p className="subtle">Build sharper searches with real outlier ranges, collection filters, duration bounds, and saved presets.</p>
+          <p className="subtle">Search inside a project, narrow to a source set, then save references and generate concepts straight into the workflow system.</p>
         </div>
       </header>
 
@@ -345,12 +405,23 @@ export default function DiscoverPage() {
               <input value={filters.search} onChange={(event) => updateFilter("search", event.target.value)} placeholder="premiere reels, @the_nicks_edit, motion..." />
             </label>
             <label className="field">
-              <span>Collection</span>
-              <select value={filters.listId} onChange={(event) => updateFilter("listId", event.target.value)}>
-                <option value="">All collections</option>
-                {collections.map((collection) => (
-                  <option key={collection.id} value={collection.id}>
-                    {collection.name}
+              <span>Project</span>
+              <select value={filters.projectId} onChange={(event) => updateFilter("projectId", event.target.value)}>
+                <option value="">All projects</option>
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
+              <span>Source set</span>
+              <select value={filters.sourceSetId} onChange={(event) => updateFilter("sourceSetId", event.target.value)}>
+                <option value="">All source sets</option>
+                {projectDetail?.sourceSets.map((sourceSet) => (
+                  <option key={sourceSet.id} value={sourceSet.id}>
+                    {sourceSet.name}
                   </option>
                 ))}
               </select>
@@ -433,11 +504,7 @@ export default function DiscoverPage() {
 
           <div className="filter-chip-row">
             {publicationPresets.map((preset) => (
-              <button
-                key={preset.days}
-                className={`filter-chip ${filters.days === preset.days ? "active" : ""}`}
-                onClick={() => updateFilter("days", preset.days)}
-              >
+              <button key={preset.days} className={`filter-chip ${filters.days === preset.days ? "active" : ""}`} onClick={() => updateFilter("days", preset.days)}>
                 {preset.label}
               </button>
             ))}
@@ -501,7 +568,7 @@ export default function DiscoverPage() {
             <section className="panel alt">
               <h3 style={{ marginTop: 0 }}>No matches for this search</h3>
               <p className="subtle" style={{ marginBottom: 0 }}>
-                Try widening the publication window, lowering min score, or clearing one of the numeric filters. If you expected results, confirm the selected collection has scanned channels.
+                Try widening the publication window, lowering min score, or clearing one of the numeric filters. If you expected results, confirm the selected project source set has scanned channels.
               </p>
             </section>
           ) : null}
@@ -525,11 +592,9 @@ export default function DiscoverPage() {
                 <span className="pill">{selected.views.toLocaleString()} views</span>
               </div>
               <div className="stack">
-                <button className="button" onClick={() => void saveSelected()}>Save to research</button>
+                <button className="button" onClick={() => void saveSelected()}>Save as reference</button>
                 {boards[0] ? <button className="button secondary" onClick={() => void addToBoard(boards[0].id)}>Add to {boards[0].name}</button> : null}
-                <button className="button secondary" onClick={() => void generate("ideas")}>Generate ideas</button>
-                <button className="button secondary" onClick={() => void generate("titles")}>Generate titles</button>
-                <button className="button secondary" onClick={() => void generate("thumbnail")}>Generate thumbnail brief</button>
+                <button className="button secondary" onClick={() => void generateConcept()}>Generate concept</button>
                 <a className="button secondary" href={`https://youtube.com/watch?v=${selected.videoId}`} target="_blank" rel="noreferrer">Open on YouTube</a>
               </div>
               <div className="panel">

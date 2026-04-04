@@ -629,6 +629,7 @@ export class WorkflowService {
       : null;
 
     const generation = await this.images.generateThumbnail({
+      projectId,
       prompt: input.prompt ?? thumbnailBrief ?? `Create a thumbnail inspired by these references for ${references[0].channelName}.`,
       promptContext: input.context ?? "Transform the reference packaging into a distinct but clearly inspired thumbnail for the target niche.",
       sourceVideoIds: references.map((video) => video.videoId),
@@ -642,6 +643,31 @@ export class WorkflowService {
       resultUrls: parseJson(generation.result_urls_json, [] as string[]),
       downloadUrls: parseJson(generation.download_urls_json, [] as string[]),
     };
+  }
+
+  listWorkflowRuns(projectId: number) {
+    const rows = db.prepare(`
+      SELECT id, mode, status, current_stage AS currentStage, target_niche AS targetNiche, target_channel_id AS targetChannelId,
+        input_json AS inputJson, output_json AS outputJson, last_error AS lastError, created_at AS createdAt, updated_at AS updatedAt, completed_at AS completedAt
+      FROM workflow_runs
+      WHERE project_id = ?
+      ORDER BY updated_at DESC, created_at DESC
+    `).all(projectId) as Array<Record<string, unknown>>;
+
+    return rows.map((row) => ({
+      id: Number(row.id),
+      mode: String(row.mode),
+      status: String(row.status),
+      currentStage: String(row.currentStage),
+      targetNiche: row.targetNiche ? String(row.targetNiche) : null,
+      targetChannelId: row.targetChannelId ? String(row.targetChannelId) : null,
+      input: parseJson(String(row.inputJson), {} as JsonRecord),
+      output: parseJson(String(row.outputJson), {} as JsonRecord),
+      lastError: row.lastError ? String(row.lastError) : null,
+      createdAt: String(row.createdAt),
+      updatedAt: String(row.updatedAt),
+      completedAt: row.completedAt ? String(row.completedAt) : null,
+    }));
   }
 
   async createWorkflowRunAsync(input: {

@@ -1,9 +1,12 @@
 import { z } from "zod";
 import type { FastifyInstance } from "fastify";
+import { db } from "../db.js";
 import { getNiches, getSimilarThumbnails, getSimilarTopics, listDiscoverOutliers } from "../services/discovery.js";
 
 const discoverQuerySchema = z.object({
   listId: z.coerce.number().int().optional(),
+  projectId: z.coerce.number().int().optional(),
+  sourceSetId: z.coerce.number().int().optional(),
   minScore: z.coerce.number().optional(),
   maxScore: z.coerce.number().optional(),
   days: z.coerce.number().int().min(1).default(365),
@@ -25,7 +28,29 @@ const discoverQuerySchema = z.object({
 });
 
 export async function registerDiscoverRoutes(app: FastifyInstance): Promise<void> {
-  app.get("/api/discover/outliers", async (request) => listDiscoverOutliers(discoverQuerySchema.parse(request.query)));
+  app.get("/api/discover/outliers", async (request) => {
+    const query = discoverQuerySchema.parse(request.query);
+    let listId = query.listId;
+
+    if (query.sourceSetId && listId === undefined) {
+      const sourceSet = db.prepare("SELECT backing_list_id FROM source_sets WHERE id = ?").get(query.sourceSetId) as
+        | { backing_list_id: number | null }
+        | undefined;
+      listId = sourceSet?.backing_list_id ?? undefined;
+    }
+
+    if (query.projectId && listId === undefined) {
+      const sourceSet = db.prepare("SELECT backing_list_id FROM source_sets WHERE project_id = ? ORDER BY id ASC LIMIT 1").get(query.projectId) as
+        | { backing_list_id: number | null }
+        | undefined;
+      listId = sourceSet?.backing_list_id ?? undefined;
+    }
+
+    return listDiscoverOutliers({
+      ...query,
+      listId,
+    });
+  });
 
   app.get("/api/discover/similar-topics", async (request, reply) => {
     const query = z.object({ videoId: z.string(), limit: z.coerce.number().int().min(1).max(30).default(12) }).parse(request.query);

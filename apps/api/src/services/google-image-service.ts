@@ -18,6 +18,7 @@ type CharacterProfile = {
 
 type ThumbnailGenerationRecord = {
   id: number;
+  project_id?: number | null;
   status: string;
   prompt: string;
   source_video_ids_json: string;
@@ -321,6 +322,7 @@ export class GoogleImageService {
   }
 
   async generateThumbnail(params: {
+    projectId?: number | null;
     prompt: string;
     sourceVideoIds: string[];
     promptContext?: string;
@@ -332,9 +334,10 @@ export class GoogleImageService {
       : undefined;
 
     const insert = db.prepare(`
-      INSERT INTO thumbnail_generations (character_profile_id, status, prompt, source_video_ids_json, prompt_context, provider, model, size, variant_count)
-      VALUES (?, 'running', ?, ?, ?, 'kie-nano-banana-2', ?, ?, 1)
+      INSERT INTO thumbnail_generations (project_id, character_profile_id, status, prompt, source_video_ids_json, prompt_context, provider, model, size, variant_count)
+      VALUES (?, ?, 'running', ?, ?, ?, 'kie-nano-banana-2', ?, ?, 1)
     `).run(
+      params.projectId ?? null,
       params.characterProfileId ?? null,
       params.prompt,
       JSON.stringify(params.sourceVideoIds),
@@ -462,10 +465,13 @@ export class GoogleImageService {
     return scores;
   }
 
-  listGenerations(): Array<Record<string, unknown>> {
-    const rows = db.prepare("SELECT * FROM thumbnail_generations ORDER BY created_at DESC LIMIT 100").all() as ThumbnailGenerationRecord[];
+  listGenerations(projectId?: number): Array<Record<string, unknown>> {
+    const rows = projectId
+      ? db.prepare("SELECT * FROM thumbnail_generations WHERE project_id = ? ORDER BY created_at DESC LIMIT 100").all(projectId) as ThumbnailGenerationRecord[]
+      : db.prepare("SELECT * FROM thumbnail_generations ORDER BY created_at DESC LIMIT 100").all() as ThumbnailGenerationRecord[];
     return rows.map((row) => ({
       ...row,
+      projectId: row.project_id ?? null,
       sourceVideoIds: parseJson(row.source_video_ids_json, [] as string[]),
       resultUrls: parseJson(row.result_urls_json, [] as string[]),
       downloadUrls: parseJson(row.download_urls_json, [] as string[]),

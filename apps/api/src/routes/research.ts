@@ -164,16 +164,18 @@ export async function registerResearchRoutes(app: FastifyInstance): Promise<void
     return { id: Number(result.lastInsertRowid), ...body };
   });
 
-  app.get("/api/boards", async () => {
+  app.get("/api/boards", async (request) => {
+    const query = z.object({ projectId: z.coerce.number().int().optional() }).parse(request.query ?? {});
     const boards = db
       .prepare(`
         SELECT boards.*, COUNT(board_items.id) AS itemCount
         FROM boards
         LEFT JOIN board_items ON board_items.board_id = boards.id
+        ${query.projectId ? "WHERE boards.project_id = ?" : ""}
         GROUP BY boards.id
         ORDER BY boards.created_at DESC
       `)
-      .all();
+      .all(...(query.projectId ? [query.projectId] : []));
     return boards;
   });
 
@@ -206,8 +208,12 @@ export async function registerResearchRoutes(app: FastifyInstance): Promise<void
   });
 
   app.post("/api/boards", async (request, reply) => {
-    const body = z.object({ name: z.string().min(1), description: z.string().optional().nullable() }).parse(request.body);
-    const result = db.prepare("INSERT INTO boards (name, description) VALUES (?, ?)").run(body.name, body.description ?? null);
+    const body = z.object({
+      projectId: z.number().int().optional().nullable(),
+      name: z.string().min(1),
+      description: z.string().optional().nullable(),
+    }).parse(request.body);
+    const result = db.prepare("INSERT INTO boards (project_id, name, description) VALUES (?, ?, ?)").run(body.projectId ?? null, body.name, body.description ?? null);
     reply.code(201);
     return { id: Number(result.lastInsertRowid), ...body };
   });
@@ -220,12 +226,16 @@ export async function registerResearchRoutes(app: FastifyInstance): Promise<void
     return { id: Number(result.lastInsertRowid), ...body };
   });
 
-  app.get("/api/ideas", async () => {
+  app.get("/api/ideas", async (request) => {
+    const query = z.object({ projectId: z.coerce.number().int().optional() }).parse(request.query ?? {});
     const rows = db
-      .prepare("SELECT * FROM idea_runs ORDER BY created_at DESC LIMIT 100")
-      .all() as Array<Record<string, unknown>>;
+      .prepare(query.projectId
+        ? "SELECT * FROM concept_runs WHERE project_id = ? ORDER BY created_at DESC LIMIT 100"
+        : "SELECT * FROM concept_runs ORDER BY created_at DESC LIMIT 100")
+      .all(...(query.projectId ? [query.projectId] : [])) as Array<Record<string, unknown>>;
     return rows.map((row) => ({
       ...row,
+      sourceReferenceIds: parseJson(String(row.source_reference_ids_json), [] as number[]),
       sourceVideoIds: parseJson(String(row.source_video_ids_json), [] as string[]),
       result: parseJson(String(row.result_json), {}),
     }));
@@ -283,7 +293,10 @@ export async function registerResearchRoutes(app: FastifyInstance): Promise<void
     return { id: Number(record.lastInsertRowid), ...result };
   });
 
-  app.get("/api/thumbnails/generations", async () => imageService.listGenerations());
+  app.get("/api/thumbnails/generations", async (request) => {
+    const query = z.object({ projectId: z.coerce.number().int().optional() }).parse(request.query ?? {});
+    return imageService.listGenerations(query.projectId);
+  });
 
   app.get("/api/thumbnails/generations/:id", async (request, reply) => {
     const id = Number((request.params as { id: string }).id);
@@ -315,6 +328,7 @@ export async function registerResearchRoutes(app: FastifyInstance): Promise<void
     const defaultProfileId = defaultProfileRow?.value ? Number(defaultProfileRow.value) : null;
 
     const generation = await imageService.generateThumbnail({
+      projectId: null,
       prompt: body.prompt,
       sourceVideoIds: body.sourceVideoIds,
       promptContext: body.context,

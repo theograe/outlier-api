@@ -29,7 +29,7 @@ OpenOutlier is moving toward this canonical workflow model:
 - `Thumbnail Run`: generated images and prompt lineage
 - `Workflow Run`: a guided pass through source discovery, research, adaptation, and thumbnail creation
 
-Legacy compatibility routes like `/api/lists` and `/api/feed` still exist for the current UI and migration path.
+Legacy compatibility routes like `/api/lists` and `/api/feed` still exist for backward compatibility, but the main local UI now runs on projects, source sets, references, concepts, boards, and workflow runs.
 
 ## Workspace layout
 
@@ -137,7 +137,7 @@ This repo is ready for an open-source MVP release, but it is still an MVP:
 
 - hosted multi-tenant deployment is not finished
 - long-running jobs still run in-process locally
-- some UI flows still use legacy list-based routes while workflow migration continues
+- compatibility list routes still exist for older integrations, but the primary UI is now project-native
 - OAuth-based provider setup is not implemented yet
 
 ## Contributing

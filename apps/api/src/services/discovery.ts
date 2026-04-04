@@ -5,6 +5,8 @@ import { GoogleImageService } from "./google-image-service.js";
 
 export type DiscoverQuery = {
   listId?: number;
+  projectId?: number;
+  sourceSetId?: number;
   minScore?: number;
   maxScore?: number;
   days: number;
@@ -143,13 +145,13 @@ export function listDiscoverOutliers(query: DiscoverQuery) {
         videos.duration_seconds AS durationSeconds,
         videos.content_type AS contentType,
         videos.scanned_at AS scannedAt,
-        MAX(saved_outliers.id) AS savedOutlierId,
+        MAX(project_references.id) AS projectReferenceId,
         COALESCE(json_group_array(DISTINCT lists.name) FILTER (WHERE lists.name IS NOT NULL), '[]') AS lists
       FROM videos
       INNER JOIN channels ON channels.id = videos.channel_id
       LEFT JOIN list_channels ON list_channels.channel_id = channels.id
       LEFT JOIN lists ON lists.id = list_channels.list_id
-      LEFT JOIN saved_outliers ON saved_outliers.video_id = videos.id
+      LEFT JOIN project_references ON project_references.video_id = videos.id
       WHERE ${whereSql}
       GROUP BY videos.id
       ORDER BY ${sortMap[query.sort]} ${orderMap[query.order]}, videos.published_at DESC

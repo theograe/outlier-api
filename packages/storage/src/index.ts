@@ -114,6 +114,7 @@ export function createSqliteStorage(databasePath: string): SqliteStorage {
       CREATE TABLE IF NOT EXISTS boards (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES workspaces(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
         name TEXT NOT NULL,
         description TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP
@@ -144,6 +145,7 @@ export function createSqliteStorage(databasePath: string): SqliteStorage {
       CREATE TABLE IF NOT EXISTS thumbnail_generations (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         workspace_id INTEGER NOT NULL DEFAULT 1 REFERENCES workspaces(id) ON DELETE CASCADE,
+        project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE,
         character_profile_id INTEGER REFERENCES character_profiles(id) ON DELETE SET NULL,
         status TEXT NOT NULL DEFAULT 'queued',
         prompt TEXT NOT NULL,
@@ -341,11 +343,24 @@ export function createSqliteStorage(databasePath: string): SqliteStorage {
       CREATE INDEX IF NOT EXISTS idx_saved_outliers_video_id ON saved_outliers(video_id);
       CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_thumbnail_generations_created_at ON thumbnail_generations(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_thumbnail_generations_project_id ON thumbnail_generations(project_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_projects_created_at ON projects(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_source_sets_project_id ON source_sets(project_id);
+      CREATE INDEX IF NOT EXISTS idx_boards_project_id ON boards(project_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_project_references_project_id ON project_references(project_id, created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_workflow_runs_project_id ON workflow_runs(project_id, updated_at DESC);
     `);
+
+    const tableHasColumn = (tableName: string, columnName: string) =>
+      (db.prepare(`PRAGMA table_info(${tableName})`).all() as Array<{ name: string }>).some((column) => column.name === columnName);
+
+    if (!tableHasColumn("boards", "project_id")) {
+      db.exec("ALTER TABLE boards ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
+    }
+
+    if (!tableHasColumn("thumbnail_generations", "project_id")) {
+      db.exec("ALTER TABLE thumbnail_generations ADD COLUMN project_id INTEGER REFERENCES projects(id) ON DELETE CASCADE;");
+    }
 
     db.prepare(`
       INSERT INTO workspaces (id, name, slug)
