@@ -23,7 +23,7 @@ If the user gives a source channel:
 - browse the returned outliers
 - save strong references into a collection
 
-If the user gives competitor channels:
+If the user gives channel examples:
 - track them directly
 - run a scan
 - browse and save

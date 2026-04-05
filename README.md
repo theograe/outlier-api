@@ -65,7 +65,7 @@ NEXT_PUBLIC_OPENOUTLIER_API_KEY=choose-a-long-random-string
 
 ## How to use it
 
-1. Add your own channel or a few competitor channels to `Tracked channels`
+1. Add your own channel or a few relevant channels to `Tracked channels`
 2. Let OpenOutlier scan them
 3. Use `Browse` to search a niche, pick a tracked source channel, or explore AI channel search
 4. Save strong outliers into `Collections`

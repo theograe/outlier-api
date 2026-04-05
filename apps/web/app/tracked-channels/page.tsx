@@ -73,8 +73,8 @@ export default function TrackedChannelsPage() {
       <header className="page-header">
         <div>
           <div className="eyebrow">Tracked Channels</div>
-          <h1 className="headline">Track competitors once, browse everywhere</h1>
-          <div className="subtle">Browse uses these channels for tracked-only and adjacent discovery.</div>
+          <h1 className="headline">Track channels once, browse the niche everywhere</h1>
+          <div className="subtle">Add your own channel or a few relevant channels here. Browse uses them to understand the niche and surface stronger outliers.</div>
         </div>
       </header>
 
@@ -89,7 +89,7 @@ export default function TrackedChannelsPage() {
             placeholder="@channel, youtube.com/@channel, or channel URL"
           />
           <button className="button" disabled={loading || !channelInput.trim()} onClick={() => void addTrackedChannel()}>
-            {loading ? "Adding..." : "Add tracked channel"}
+            {loading ? "Adding..." : "Track channel"}
           </button>
         </div>
       </section>
@@ -115,7 +115,7 @@ export default function TrackedChannelsPage() {
         ))}
       </section>
 
-      {channels.length === 0 ? <section className="panel alt">No tracked channels yet. Add a few competitors to shape Browse.</section> : null}
+      {channels.length === 0 ? <section className="panel alt">No tracked channels yet. Add your own channel or a few channels in your niche to shape Browse.</section> : null}
     </div>
   );
 }
